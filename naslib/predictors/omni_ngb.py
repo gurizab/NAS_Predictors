@@ -13,6 +13,7 @@ from ConfigSpace.hyperparameters import CategoricalHyperparameter, \
     UniformFloatHyperparameter, UniformIntegerHyperparameter
 from smac.configspace import ConfigurationSpace
 from smac.facade.smac_hpo_facade import SMAC4HPO
+from smac.facade.smac_ac_facade import SMAC4AC
 from smac.scenario.scenario import Scenario
 from functools import partial
 from naslib.predictors.predictor import Predictor
@@ -77,11 +78,40 @@ class OmniNGBPredictor(Predictor):
                 self.xtrain_zc_info[f'{method_name}_scores'] = normalized_train
                 self.xtest_zc_info[f'{method_name}_scores'] = normalized_test
 
+    @property
+    def default_hyperparams(self):
+        params = {
+            'param:n_estimators': 505,
+            'param:learning_rate': 0.08127053060223186,
+            'base:max_depth': 6,
+            'base:max_features': 0.7920456318712875,
+            'base:min_samples_leaf': 1,
+            'base:min_samples_split': 2,
+            # 'early_stopping_rounds': 100,
+            # 'verbose': -1
+        }
+        return params
+
+    def set_random_hyperparams(self):
+        if self.hyperparams is None:
+            # evaluate the default config first during HPO
+            params = self.default_hyperparams.copy()
+        else:
+            params = {
+                'param:n_estimators': int(loguniform(128, 512)),
+                'param:learning_rate': loguniform(.001, .1),
+                'base:max_depth': np.random.choice(24) + 1,
+                'base:max_features': np.random.uniform(.1, 1),
+                'base:min_samples_leaf': np.random.choice(18) + 2,
+                'base:min_samples_split': np.random.choice(18) + 2,
+            }
+        self.hyperparams = params
+        return params
+
     def get_random_params(self):
         params = {
             'param:n_estimators': int(loguniform(128, 512)),
             'param:learning_rate': loguniform(.001, .1),
-            'param:minibatch_frac': np.random.uniform(.1, 1),
             'base:max_depth': np.random.choice(24) + 1,
             'base:max_features': np.random.uniform(.1, 1),
             'base:min_samples_leaf': np.random.choice(18) + 2,
@@ -92,12 +122,11 @@ class OmniNGBPredictor(Predictor):
         cs = ConfigurationSpace()
         n_estimators = UniformIntegerHyperparameter("param:n_estimators", 128, 512, default_value=128, log=True)
         learning_rate = UniformFloatHyperparameter("param:learning_rate", 0.001, 0.1, default_value=0.001, log=True)
-        minibatch_frac = UniformFloatHyperparameter('param:minibatch_frac', 0.1, 1.0, default_value=1.0)
         max_depth = UniformIntegerHyperparameter('base:max_depth', 1, 25, default_value=1.0)
         max_features = UniformFloatHyperparameter('base:max_features', 0.1, 1.0, default_value=0.1)
         min_samples_leaf = UniformIntegerHyperparameter('base:min_samples_leaf', 2, 20, default_value=2)
         min_samples_split = UniformIntegerHyperparameter('base:min_samples_split', 2, 20, default_value=2)
-        cs.add_hyperparameters([n_estimators, learning_rate, minibatch_frac, max_depth, max_features, min_samples_leaf,
+        cs.add_hyperparameters([n_estimators, learning_rate, max_depth, max_features, min_samples_leaf,
                                 min_samples_split])
 
         return cs
@@ -125,36 +154,46 @@ class OmniNGBPredictor(Predictor):
                                  "deterministic": "true",
                                  "limit_resources": False,
                                  })
-            smac = SMAC4HPO(scenario=scenario, rng=np.random.RandomState(42),
+            smac = SMAC4AC(scenario=scenario, rng=np.random.RandomState(6),
                             tae_runner=partial(self.cross_validate, xtrain, ytrain))
             # Start optimization
             try:
                 best_params = smac.optimize()
             finally:
-                best_params = smac.solver.incumbent
+                best_params = smac.solver.incumbent.get_dictionary()
                 print("Best Params: %s" % best_params)
-        return best_params.get_dictionary()
+        return best_params
         
     def cross_validate(self, xtrain, ytrain, params):
+        if type(params) != dict:
+            params = params.get_dictionary()
+        for key in ['base:min_samples_leaf', 'base:min_samples_split']:
+            params[key] = max(2, min(params[key], int(len(xtrain) / 3) - 1))
+
         base_learner = DecisionTreeRegressor(criterion='friedman_mse',
                                              random_state=None,
                                              splitter='best',
-                                             **parse_params(params.get_dictionary(), 'base:'))
-        model = NGBRegressor(Dist=Normal, Base=base_learner, Score=LogScore,
-                             verbose=False, **parse_params(params.get_dictionary(), 'param:'))
+                                             # min_samples_leaf=1,
+                                             # min_samples_split=2,
+                                             **parse_params(params, 'base:'))
+        model = NGBRegressor(Dist=Normal, Base=base_learner, Score=LogScore, minibatch_frac=0.5,
+                             verbose=False, **parse_params(params, 'param:'))
         scores = cross_val_score(model, xtrain, ytrain, cv=3)
         return np.mean(scores)
 
-    def prepare_features(self, xdata, info, train=True):
+    def prepare_features(self, xdata, info, train=True, indexes=None):
         # prepare training data features
         full_xdata = [[] for _ in range(len(xdata))]
         if len(self.zero_cost) > 0 and self.train_size <= self.max_zerocost: 
             if self.run_pre_compute:
                 for key in self.xtrain_zc_info:
-                    if train:
-                        full_xdata = [[*x, self.xtrain_zc_info[key][i]] for i, x in enumerate(full_xdata)]
+                    if indexes is not None:
+                        full_xdata = [[*full_xdata[idx], self.xtrain_zc_info[key][i]] for idx, i in enumerate(indexes)]
                     else:
-                        full_xdata = [[*x, self.xtest_zc_info[key][i]] for i, x in enumerate(full_xdata)]
+                        if train:
+                            full_xdata = [[*x, self.xtrain_zc_info[key][i]] for i, x in enumerate(full_xdata)]
+                        else:
+                            full_xdata = [[*x, self.xtest_zc_info[key][i]] for i, x in enumerate(full_xdata)]
             else:
                 # if the zero_cost scores were not precomputed, they are in info
                 full_xdata = [[*x, info[i]] for i, x in enumerate(full_xdata)]
@@ -183,7 +222,7 @@ class OmniNGBPredictor(Predictor):
 
         return np.array(full_xdata)
         
-    def fit(self, xtrain, ytrain, train_info, learn_hyper=True):
+    def fit(self, xtrain, ytrain, train_info, learn_hyper=True, train_indexes=None):
 
         # if we are below the min train size, use the zero_cost and lce info
         if len(xtrain) < self.min_train_size:
@@ -196,21 +235,30 @@ class OmniNGBPredictor(Predictor):
         self.mean = np.mean(ytrain)
         self.std = np.std(ytrain)
         ytrain = (np.array(ytrain)-self.mean)/self.std
-        xtrain = self.prepare_features(xtrain, train_info, train=True)
-        params = self.hyperparams
+        if train_indexes is not None:
+            xtrain = self.prepare_features(xtrain, train_info, train=True, indexes=train_indexes)
+        else:
+            xtrain = self.prepare_features(xtrain, train_info, train=True)
+        if self.hyperparams is not None:
+            params = self.hyperparams
+        else:
+            params = self.run_hpo(xtrain, ytrain)
 
         # todo: this code is repeated in cross_validate
         base_learner = DecisionTreeRegressor(criterion='friedman_mse',
                                              random_state=None,
                                              splitter='best',
                                              **parse_params(params, 'base:'))
-        self.model = NGBRegressor(Dist=Normal, Base=base_learner, Score=LogScore,
+        self.model = NGBRegressor(Dist=Normal, Base=base_learner, Score=LogScore, minibatch_frac=0.5,
                                   verbose=True, **parse_params(params, 'param:'))
         self.model.fit(xtrain, ytrain)
 
-    def query(self, xtest, info):
+    def query(self, xtest, info, val_indexes=None):
         if self.trained:
-            test_data = self.prepare_features(xtest, info, train=False)
+            if val_indexes is not None:
+                test_data = self.prepare_features(xtest, info, train=False, indexes=val_indexes)
+            else:
+                test_data = self.prepare_features(xtest, info, train=False)
             return np.squeeze(self.model.predict(test_data)) * self.std + self.mean
         else:
             logger.info('below the train size, so returning info')

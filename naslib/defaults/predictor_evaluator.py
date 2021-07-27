@@ -10,11 +10,14 @@ from scipy import stats
 from sklearn import metrics
 import math
 from smac.facade.smac_hpo_facade import SMAC4HPO
+from smac.facade.smac_ac_facade import SMAC4AC
+from smac.facade.smac_bohb_facade import BOHB4HPO
 from smac.scenario.scenario import Scenario
 from functools import partial
 from naslib.search_spaces.core.query_metrics import Metric
 from naslib.utils import generate_kfold, cross_validation
 from naslib.benchmarks.predictors.predictor_config_space import PredictorConfigSpace
+
 logger = logging.getLogger(__name__)
 
 
@@ -34,7 +37,7 @@ class PredictorEvaluator(object):
 
         self.test_size = config.test_size
         self.train_size_single = config.train_size_single
-        self.train_size_list = config.train_size_list        
+        self.train_size_list = config.train_size_list
         self.fidelity_single = config.fidelity_single
         self.fidelity_list = config.fidelity_list
         self.max_hpo_time = config.max_hpo_time
@@ -73,18 +76,18 @@ class PredictorEvaluator(object):
             self.hyperparameters = True
         else:
             raise NotImplementedError('This search space is not yet implemented in PredictorEvaluator.')
-            
+
     def get_full_arch_info(self, arch):
         """
         Given an arch, return the accuracy, train_time,
         and also a dict of extra info if required by the predictor
         """
         info_dict = {}
-        accuracy = arch.query(metric=self.metric, 
-                              dataset=self.dataset, 
+        accuracy = arch.query(metric=self.metric,
+                              dataset=self.dataset,
                               dataset_api=self.dataset_api)
-        train_time = arch.query(metric=Metric.TRAIN_TIME, 
-                                dataset=self.dataset, 
+        train_time = arch.query(metric=Metric.TRAIN_TIME,
+                                dataset=self.dataset,
                                 dataset_api=self.dataset_api)
         data_reqs = self.predictor.get_data_reqs()
         if data_reqs['requires_partial_lc']:
@@ -93,9 +96,9 @@ class PredictorEvaluator(object):
             if type(data_reqs['metric']) is list:
                 for metric_i in data_reqs['metric']:
                     metric_lc = arch.query(metric=metric_i,
-                                    full_lc=True,
-                                    dataset=self.dataset,
-                                    dataset_api=self.dataset_api)
+                                           full_lc=True,
+                                           dataset=self.dataset,
+                                           dataset_api=self.dataset_api)
                     info_dict[f'{metric_i.name}_lc'] = metric_lc
 
             else:
@@ -105,12 +108,12 @@ class PredictorEvaluator(object):
                                 dataset_api=self.dataset_api)
                 info_dict['lc'] = lc
             if data_reqs['requires_hyperparameters']:
-                assert self.hyperparameters, 'This predictor requires querying arch hyperparams'                
+                assert self.hyperparameters, 'This predictor requires querying arch hyperparams'
                 for hp in data_reqs['hyperparams']:
-                    info_dict[hp] = arch.query(Metric.HP, dataset=self.dataset, 
+                    info_dict[hp] = arch.query(Metric.HP, dataset=self.dataset,
                                                dataset_api=self.dataset_api)[hp]
         return accuracy, train_time, info_dict
-            
+
     def load_dataset(self, load_labeled=False, data_size=10, arch_hash_map={}):
         """
         There are two ways to load an architecture.
@@ -134,13 +137,13 @@ class PredictorEvaluator(object):
             else:
                 arch = self.search_space.clone()
                 arch.load_labeled_architecture(dataset_api=self.dataset_api)
-            
+
             arch_hash = arch.get_hash()
             if arch_hash in arch_hash_map:
                 continue
             else:
                 arch_hash_map[arch_hash] = True
-            
+
             accuracy, train_time, info_dict = self.get_full_arch_info(arch)
             xdata.append(arch)
             ydata.append(accuracy)
@@ -160,7 +163,7 @@ class PredictorEvaluator(object):
         ydata = []
         info = []
         train_times = []
-        
+
         # step 1: create a large pool of architectures
         while len(xdata) < self.mutate_pool:
             arch = self.search_space.clone()
@@ -175,7 +178,7 @@ class PredictorEvaluator(object):
             ydata.append(accuracy)
             info.append(info_dict)
             train_times.append(train_time)
-            
+
         # step 2: prune the pool down to the top 5 architectures
         indices = np.flip(np.argsort(ydata))[:self.num_arches_to_mutate]
         xdata = [xdata[i] for i in indices]
@@ -205,8 +208,8 @@ class PredictorEvaluator(object):
             train_times.append(train_time)
 
         return [xdata, ydata, info, train_times], arch_hash_map
-    
-    def load_mutated_train(self, data_size=10, arch_hash_map={}, 
+
+    def load_mutated_train(self, data_size=10, arch_hash_map={},
                            test_data=[]):
         """
         Load a training set not uniformly at random, but by picking architectures
@@ -219,7 +222,7 @@ class PredictorEvaluator(object):
         ydata = []
         info = []
         train_times = []
-        
+
         while len(xdata) < data_size:
             idx = np.random.choice(len(test_data[0]))
             parent = test_data[0][idx]
@@ -247,7 +250,7 @@ class PredictorEvaluator(object):
         train_size = len(xtrain)
 
         data_reqs = self.predictor.get_data_reqs()
-    
+
         logger.info("Fit the predictor")
         if data_reqs['requires_partial_lc']:
             """
@@ -271,25 +274,24 @@ class PredictorEvaluator(object):
             self.predictor.set_hyperparams(params)
         fit_time_start = time.time()
         cv_score = 0
-        if self.max_hpo_time > 0 and len(xtrain) >= 10 and self.predictor.get_hpo_wrapper():
-
+        if self.max_hpo_time > 0 and self.predictor.get_hpo_wrapper():
             # run cross-validation (for model-based predictors)
             hyperparams, cv_score = self.run_hpo(xtrain, ytrain, train_info,
                                                  start_time=fit_time_start,
                                                  metric='kendalltau'
                                                  )
             self.predictor.set_hyperparams(hyperparams)
-            
+
         self.predictor.fit(xtrain, ytrain, train_info)
         hyperparams = self.predictor.get_hyperparams()
-        
+
         fit_time_end = time.time()
         test_pred = self.predictor.query(xtest, test_info)
         query_time_end = time.time()
 
-        #If the predictor is an ensemble, take the mean
-        if len(test_pred.shape) > 1:
-            test_pred = np.mean(test_pred, axis=0)
+        # If the predictor is an ensemble, take the mean
+        # if len(test_pred.shape) > 1:
+        #     test_pred = np.mean(test_pred, axis=0)
 
         logger.info("Compute evaluation metrics")
         results_dict = self.compare(ytest, test_pred)
@@ -310,7 +312,8 @@ class PredictorEvaluator(object):
         for key in results_dict:
             if type(results_dict[key]) not in [str, set, bool]:
                 # todo: serialize other types
-                print_string += key + ': {}, '.format(np.round(results_dict[key], 4))
+                if type(results_dict[key]) in [int, float]:
+                    print_string += key + ': {}, '.format(np.round(results_dict[key], 4))
         logger.info(print_string)
         self.results.append(results_dict)
         """
@@ -324,10 +327,10 @@ class PredictorEvaluator(object):
         logger.info("Load the test set")
         if self.uniform_random:
             self.test_data, arch_hash_map = self.load_dataset(load_labeled=self.load_labeled,
-                                                         data_size=self.test_size)
+                                                              data_size=self.test_size)
         else:
             self.test_data, arch_hash_map = self.load_mutated_test(data_size=self.test_size)
-            
+
         logger.info("Load the training set")
         max_train_size = self.train_size_single
 
@@ -336,12 +339,12 @@ class PredictorEvaluator(object):
 
         if self.uniform_random:
             self.full_train_data, _ = self.load_dataset(load_labeled=self.load_labeled,
-                                                   data_size=max_train_size, 
-                                                   arch_hash_map=arch_hash_map)
+                                                        data_size=max_train_size,
+                                                        arch_hash_map=arch_hash_map)
         else:
             self.full_train_data, _ = self.load_mutated_train(data_size=max_train_size,
-                                                         arch_hash_map=arch_hash_map, 
-                                                         test_data=test_data)
+                                                              arch_hash_map=arch_hash_map,
+                                                              test_data=self.test_data)
 
         # if the predictor requires unlabeled data (e.g. SemiNAS), generate it:
         reqs = self.predictor.get_data_reqs()
@@ -350,11 +353,11 @@ class PredictorEvaluator(object):
             logger.info("Load unlabeled data")
             unlabeled_size = max_train_size * reqs['unlabeled_factor']
             [unlabeled_data, _, _, _], _ = self.load_dataset(load_labeled=self.load_labeled,
-                                                             data_size=unlabeled_size, 
+                                                             data_size=unlabeled_size,
                                                              arch_hash_map=arch_hash_map)
 
         # some of the predictors use a pre-computation step to save time in batch experiments:
-        self.predictor.pre_compute(self.full_train_data[0], self.test_data[0] , unlabeled_data)
+        self.predictor.pre_compute(self.full_train_data[0], self.test_data[0], unlabeled_data)
 
     def evaluate(self, params=None):
 
@@ -367,19 +370,19 @@ class PredictorEvaluator(object):
             fidelity = self.fidelity_single
             for train_size in self.train_size_list:
                 train_data = [data[:train_size] for data in self.full_train_data]
-                self.single_evaluate(train_data, self.test_data, fidelity=fidelity)
+                self.single_evaluate(train_data, self.test_data, fidelity=fidelity, params=params)
 
         elif self.experiment_type == 'vary_fidelity':
             train_size = self.train_size_single
             for fidelity in self.fidelity_list:
-                self.single_evaluate(self.full_train_data, self.test_data, fidelity=fidelity)
+                self.single_evaluate(self.full_train_data, self.test_data, fidelity=fidelity, params=params)
 
         elif self.experiment_type == 'vary_both':
             for train_size in self.train_size_list:
                 train_data = [data[:train_size] for data in self.full_train_data]
 
                 for fidelity in self.fidelity_list:
-                    self.single_evaluate(train_data, self.test_data, fidelity=fidelity)
+                    self.single_evaluate(train_data, self.test_data, fidelity=fidelity, params=params)
 
         else:
             raise NotImplementedError()
@@ -397,14 +400,14 @@ class PredictorEvaluator(object):
         try:
             metrics_dict['mae'] = np.mean(abs(test_pred - ytest))
             metrics_dict['rmse'] = metrics.mean_squared_error(ytest, test_pred, squared=False)
-            metrics_dict['pearson'] = np.abs(np.corrcoef(ytest, test_pred)[1,0])
+            metrics_dict['pearson'] = np.abs(np.corrcoef(ytest, test_pred)[1, 0])
             metrics_dict['spearman'] = stats.spearmanr(ytest, test_pred)[0]
             metrics_dict['kendalltau'] = stats.kendalltau(ytest, test_pred)[0]
             metrics_dict['kt_2dec'] = stats.kendalltau(ytest, np.round(test_pred, decimals=2))[0]
             metrics_dict['kt_1dec'] = stats.kendalltau(ytest, np.round(test_pred, decimals=1))[0]
             for k in [10, 20]:
-                top_ytest = np.array([y > sorted(ytest)[max(-len(ytest),-k-1)] for y in ytest])
-                top_test_pred = np.array([y > sorted(test_pred)[max(-len(test_pred),-k-1)] for y in test_pred])
+                top_ytest = np.array([y > sorted(ytest)[max(-len(ytest), -k - 1)] for y in ytest])
+                top_test_pred = np.array([y > sorted(test_pred)[max(-len(test_pred), -k - 1)] for y in test_pred])
                 metrics_dict['precision_{}'.format(k)] = sum(top_ytest & top_test_pred) / k
         except:
             for metric in METRICS:
@@ -420,7 +423,6 @@ class PredictorEvaluator(object):
         logger.info(f'Starting cross validation')
         n_train = len(xtrain)
         split_indices = generate_kfold(n_train, 3)
-
 
         predictor.set_hyperparams(hyperparams.get_dictionary())
 
@@ -440,10 +442,11 @@ class PredictorEvaluator(object):
                              # max. number of function evaluations; for this example set to a low number
                              "cs": cs,  # configuration space
                              "deterministic": "true",
-                             "limit_resources": False
+                             "limit_resources": False,
+                             "initial_incumbent": 'DEFAULT',
                              })
-        smac = SMAC4HPO(scenario=scenario, rng=np.random.RandomState(42),
-                        tae_runner=partial(self.smac_optimize, predictor, xtrain, ytrain, train_info, metric))
+        smac = SMAC4AC(scenario=scenario, rng=np.random.RandomState(self.config.seed),
+                       tae_runner=partial(self.smac_optimize, predictor, xtrain, ytrain, train_info, metric))
 
         try:
             incumbent = smac.optimize()
@@ -495,7 +498,7 @@ class PredictorEvaluator(object):
         self.predictor.hyperparams = best_hyperparams
 
         return best_hyperparams.copy(), best_score
-    
+
     def _log_to_json(self):
         """log statistics to json file"""
         if not os.path.exists(self.config.save):

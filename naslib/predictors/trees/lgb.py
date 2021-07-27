@@ -55,6 +55,9 @@ class LGBoost(BaseTree):
 
 
     def train(self, train_data):
+        if 'min_data_in_leaf' in self.hyperparams:
+            self.hyperparams['min_data_in_leaf'] = max(2, min(self.hyperparams['min_data_in_leaf'],
+                                                       int(len(train_data) / 3) - 1))
         hparams = {**self.hyperparams, 'metric':{'l2'}}
         return lgb.train(hparams, train_data,
                          num_boost_round=500)
@@ -67,6 +70,7 @@ class LGBoost(BaseTree):
         if params is None:
             if self.hyperparams is None:
                 params = self.default_hyperparams.copy()
+                self.hyperparams = self.default_hyperparams.copy()
             elif self.hyperparams is not None:
                 params = self.hyperparams
         return super(LGBoost, self).fit(xtrain, ytrain, train_info, params, **kwargs)

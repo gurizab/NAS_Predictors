@@ -120,7 +120,7 @@ class GCNPredictor(Predictor):
         return predictor
 
     def fit(self, xtrain, ytrain, train_info=None, 
-            epochs=300, omni=False):
+            epochs=300, omni=False, train_indexes=None):
 
         if self.hyperparams is None:
             self.hyperparams = self.default_hyperparams.copy()
@@ -173,7 +173,7 @@ class GCNPredictor(Predictor):
         train_error = np.mean(abs(train_pred-ytrain))
         return train_error
 
-    def query(self, xtest, info=None, eval_batch_size=1000, omni=False):
+    def query(self, xtest, info=None, eval_batch_size=1000, omni=False, val_indexes=None):
         if omni:
             test_data = xtest
         else:

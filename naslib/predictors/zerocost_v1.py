@@ -59,7 +59,7 @@ class ZeroCostV1(Predictor):
     def pre_process(self):
         self.train_loader, _, _, _, _ = get_train_val_loaders(self.config, mode='train')
 
-    def query(self, xtest, info=None):
+    def query(self, xtest, info=None, val_indexes=None):
 
         test_set_scores = []
         count = 0

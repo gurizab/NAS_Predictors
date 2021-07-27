@@ -458,7 +458,10 @@ class SemiNASPredictor(Predictor):
         self.default_hyperparams = {'gcn_hidden':64, 
                                     'batch_size':100, 
                                     'lr':1e-3}
-        self.hyperparams = hyperparams
+        if hyperparams is None:
+            self.hyperparams = self.default_hyperparams.copy()
+        else:
+            self.hyperparams = hyperparams
         
     def generate_synthetic_data(self, model, num_synthetic):
         synthetic_input = []
@@ -490,7 +493,7 @@ class SemiNASPredictor(Predictor):
 
     def fit(self, xtrain, ytrain, train_info=None,
             wd=0, iterations=1, epochs=50,
-            pretrain_epochs=50, omni=False):
+            pretrain_epochs=50, omni=False, train_indexes=None):
 
         if self.hyperparams is None:
             self.hyperparams = self.default_hyperparams.copy()
@@ -584,7 +587,7 @@ class SemiNASPredictor(Predictor):
         train_error = np.mean(abs(train_pred-ytrain))
         return train_error
 
-    def query(self, xtest, info=None, eval_batch_size=100, omni=False):
+    def query(self, xtest, info=None, eval_batch_size=100, omni=False, val_indexes=None):
 
         test_seq_pool = []
         for i, arch in enumerate(xtest):

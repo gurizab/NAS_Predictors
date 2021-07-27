@@ -11,17 +11,16 @@ class PredictorConfigSpace:
     def get_configspace(self):
         cs = ConfigurationSpace()
         # Conditions
-        if self.predictor_type in ['NGB', 'OMNI_NGB']:
-            n_estimators = UniformIntegerHyperparameter("param:n_estimators", 128, 512, default_value=128, log=True)
-            learning_rate = UniformFloatHyperparameter("param:learning_rate", 0.001, 0.1, default_value=0.001, log=True)
-            minibatch_frac = UniformFloatHyperparameter('param:minibatch_frac', 0.1, 1.0, default_value=1.0)
-            max_depth = UniformIntegerHyperparameter('base:max_depth', 1, 25, default_value=1.0)
-            max_features = UniformFloatHyperparameter('base:max_features', 0.1, 1.0, default_value=0.1)
-            min_samples_leaf = UniformIntegerHyperparameter('base:min_samples_leaf', 2, 20, default_value=2)
-            min_samples_split = UniformIntegerHyperparameter('base:min_samples_split', 2, 20, default_value=2)
+        if self.predictor_type in ['NGB', 'OMNI_NGB', 'OMNI_NGB2']:
+            n_estimators = UniformIntegerHyperparameter("param:n_estimators", 128, 512, default_value=236, log=True)
+            learning_rate = UniformFloatHyperparameter("param:learning_rate", 0.001, 0.1,
+                                                       default_value=0.006724595976491001, log=True)
+            max_depth = UniformIntegerHyperparameter('base:max_depth', 1, 25, default_value=10)
+            max_features = UniformFloatHyperparameter('base:max_features', 0.1, 1.0, default_value=0.7394770722643155)
+            # min_samples_leaf = UniformIntegerHyperparameter('base:min_samples_leaf', 2, 20, default_value=6)
+            # min_samples_split = UniformIntegerHyperparameter('base:min_samples_split', 2, 20, default_value=4)
             cs.add_hyperparameters(
-                [n_estimators, learning_rate, minibatch_frac, max_depth, max_features, min_samples_leaf,
-                 min_samples_split])
+                [n_estimators, learning_rate, max_depth, max_features])
         if self.predictor_type in ['XGB', 'OMNI_XGB']:
             # XGB
             max_depth = UniformIntegerHyperparameter("max_depth", 1, 15, default_value=6)
@@ -36,11 +35,7 @@ class PredictorConfigSpace:
             beta = UniformFloatHyperparameter('beta', 1e-5, 1e5, default_value=100)
             basis_func = CategoricalHyperparameter('basis_func', ['linear_basis_func', 'quadratic_basis_func'],
                                                    default_value='linear_basis_func')
-            do_mcmc_blr = CategoricalHyperparameter('do_mcmc', choices=[True, False])
-            n_hypers = UniformIntegerHyperparameter('n_hypers', 1, 50, default_value=20)
-            chain_length = UniformIntegerHyperparameter('chain_length', 50, 500, default_value=100)
-            burnin_steps = UniformIntegerHyperparameter('burnin_steps', 50, 500, default_value=100)
-            cs.add_hyperparameters([alpha, beta, basis_func, do_mcmc_blr, n_hypers, chain_length, burnin_steps])
+            cs.add_hyperparameters([alpha, beta, basis_func])
         elif self.predictor_type in ['BANANAS', 'MLP']:
             # BANANAS
             num_layers = UniformIntegerHyperparameter('num_layers', 5, 25, default_value=20)
@@ -51,13 +46,13 @@ class PredictorConfigSpace:
             cs.add_hyperparameters([num_layers, layer_width, lr_bananas, batch_size_bananas, regularization])
         elif self.predictor_type == 'BOHAMIANN':
             # BOHAMIANN
-            num_steps = UniformIntegerHyperparameter('num_steps', 50, 500, default_value=100)
-            keep_every = UniformIntegerHyperparameter('keep_every', 2, 50, default_value=5)
+            num_steps = UniformIntegerHyperparameter('num_steps', 60, 500, default_value=100)
+            keep_every = UniformIntegerHyperparameter('keep_every', 1, 10, default_value=5)
             lr_bohamiann = UniformFloatHyperparameter('lr', 0.00001, 0.1, log=True)
-            num_burn_in_steps = UniformIntegerHyperparameter('num_burn_in_steps', 5, 200, default_value=10)
+            num_burn_in_steps = UniformIntegerHyperparameter('num_burn_in_steps', 5, 50, default_value=10)
             cs.add_hyperparameters([num_steps, keep_every, lr_bohamiann, num_burn_in_steps])
-        elif self.predictor_type in ['BONAS', 'NAO']:
-            # BONAS
+        elif self.predictor_type in ['BONAS', 'NAO', 'OMNI_SEMINAS', 'SEMINAS']:
+            # BONAS, NAO, OMNI_SEMINAS, SEMINAS
             gcn_hidden = UniformIntegerHyperparameter('gcn_hidden', 16, 128, default_value=64, log=True)
             batch_size_bonas = UniformIntegerHyperparameter('batch_size', 32, 256, default_value=128, log=True)
             lr_bonas = UniformFloatHyperparameter('lr', 0.00001, 0.1, log=True)
@@ -71,18 +66,14 @@ class PredictorConfigSpace:
             n_units_3 = UniformIntegerHyperparameter('n_units_3', 10, 100, default_value=50)
             alpha_dngo = UniformFloatHyperparameter('alpha', 1e-5, 1e5, default_value=1.0)
             beta_dngo = UniformFloatHyperparameter('beta', 1e-5, 1e5, default_value=100)
-            do_mcmc_dngo = CategoricalHyperparameter('do_mcmc', [True, False], default_value=False)
-            n_hypers_dngo = UniformIntegerHyperparameter('n_hypers', 1, 50, default_value=20)
-            chain_length_dngo = UniformIntegerHyperparameter('chain_length', 1000, 4000, default_value=1000)
-            burnin_steps_dngo = UniformIntegerHyperparameter('burnin_steps', 1000, 4000, default_value=1000)
             cs.add_hyperparameters(
-                [batch_size_dngo, num_epochs, lr_dngo, n_units_1, n_units_2, n_units_3, alpha_dngo, beta_dngo,
-                 do_mcmc_dngo, n_hypers_dngo, chain_length_dngo, burnin_steps_dngo])
-        elif self.predictor_type == 'LGB':
+                [batch_size_dngo, num_epochs, lr_dngo, n_units_1, n_units_2, n_units_3, alpha_dngo, beta_dngo])
+        elif self.predictor_type in ['LGB', 'OMNI_LGB']:
             # LGB
-            num_leaves = UniformIntegerHyperparameter('num_leaves', 10, 100, default_value=31)
-            lr_lgb = UniformFloatHyperparameter('learning_rate', 0.00001, 0.9, default_value=0.5, log=True)
-            feature_fraction = UniformFloatHyperparameter('feature_fraction', 0.1, 1, default_value=0.9)
+            num_leaves = UniformIntegerHyperparameter('num_leaves', 10, 100, default_value=81)
+            lr_lgb = UniformFloatHyperparameter('learning_rate', 0.00001, 0.9, default_value=0.009570519683309102,
+                                                log=True)
+            feature_fraction = UniformFloatHyperparameter('feature_fraction', 0.1, 1, default_value=0.9093860758993939)
             cs.add_hyperparameters([num_leaves, lr_lgb, feature_fraction])
         elif self.predictor_type == 'GCN':
             # GCN
@@ -95,9 +86,9 @@ class PredictorConfigSpace:
             n_estimators = UniformIntegerHyperparameter('n_estimators', 16, 128, default_value=116, log=True)
             max_features = UniformFloatHyperparameter('max_features', 0.1, 0.9, default_value=0.17055852159745608,
                                                       log=True)
-            min_samples_leaf = UniformIntegerHyperparameter('min_samples_leaf', 1, 20, default_value=2)
-            min_samples_split = UniformIntegerHyperparameter('min_samples_split', 2, 20, default_value=2)
-            cs.add_hyperparameters([n_estimators, max_features, min_samples_leaf, min_samples_split])
+            # min_samples_leaf = UniformIntegerHyperparameter('min_samples_leaf', 1, 20, default_value=2)
+            # min_samples_split = UniformIntegerHyperparameter('min_samples_split', 2, 20, default_value=2)
+            cs.add_hyperparameters([n_estimators, max_features])
         elif self.predictor_type in ['GP', 'GPWL', 'SPARSE_GP', 'VAR_SPARSE_GP']:
             # GP
             kernel_gp = CategoricalHyperparameter('kernel_type', ['RBF', 'Matern32', 'Matern52'], default_value='RBF')

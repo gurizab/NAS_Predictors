@@ -70,7 +70,7 @@ supported_predictors = {
     'ngb_path': NGBoost(encoding_type='path', hpo_wrapper=True),
     # omni:
     'omni_ngb': OmniNGBPredictor(encoding_type='adjacency_one_hot', config=config,
-                                 zero_cost=['jacov'], lce=['sotle'], hpo_wrapper=True),
+                                 zero_cost=['jacov'], lce=['sotle'], hpo_wrapper=False),
     'omni_seminas': OmniSemiNASPredictor(encoding_type='seminas', config=config,
                                          semi=True, hpo_wrapper=True,
                                          zero_cost=['jacov'], lce=['sotle'],
@@ -88,6 +88,10 @@ supported_predictors = {
                                              zero_cost=['jacov'], lce=['sotle']),
     'omni_xgb': OmniPredictor(encoding_type='adjacency_one_hot', config=config,
                               zero_cost=['jacov'], lce=['sotle'], hpo_wrapper=True),
+    'omni_lgb': OmniPredictor(encoding_type='adjacency_one_hot', config=config,
+                              zero_cost=['grad_norm'], lce=['sotle'], hpo_wrapper=True),
+    'omni_ngb2': OmniPredictor(encoding_type='adjacency_one_hot', config=config,
+                              zero_cost=['grad_norm'], lce=['sotle'], model_type='NGB', hpo_wrapper=True),
 }
 
 supported_search_spaces = {
@@ -105,8 +109,16 @@ load_labeled = (True if config.search_space in ['darts', 'nlp'] else False)
 dataset_api = get_dataset_api(config.search_space, config.dataset)
 
 # initialize the search space and predictor
-utils.set_seed(config.seed)
 predictor = supported_predictors[config.predictor]
+params_ngb = {
+    "base:max_depth": 10,
+    "base:max_features": 0.7394770722643155,
+    "base:min_samples_leaf": 1,
+    "base:min_samples_split": 2,
+    "param:learning_rate": 0.006724595976491001,
+    "param:n_estimators": 236
+        }
+# predictor.set_hyperparams(params=params_ngb)
 search_space = supported_search_spaces[config.search_space]
 
 # initialize the PredictorEvaluator class

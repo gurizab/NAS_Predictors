@@ -13,7 +13,7 @@ search_space: nasbench201
 dataset: cifar10
 
 # one of the 31 predictors in benchmarks/predictors/runner.py
-predictor: omni_xgb
+predictor: omni_ngb
 
 # 0: mutation-based, or 1: uniformly random, train/test sets
 uniform_random: 1
@@ -22,18 +22,18 @@ uniform_random: 1
 test_size: 200
 
 # size of the training set (used by model-based predictors)
-train_size_single: 500
-train_size_list: [5, 8, 14, 24, 42, 71, 121, 205, 347, 589, 1000]
+train_size_single: 8
+train_size_list: [5, 8, 14, 24, 42, 71, 121, 205, 347] #, 589, 1000]
 
 # num. epochs to train the test set arches (used by learning curve methods)
-fidelity_single: 100
+fidelity_single: 37
 fidelity_list: [1, 2, 3, 5, 7, 9, 13, 19, 26, 37, 52, 73, 102, 142, 199]
 
 # output results to this directory
 out_dir: run
 
 # maximum number of seconds to run cross-validation (for model-based predictors)
-max_hpo_time: 0
+max_hpo_time: 900
 hpo_method: SMAC
 
 # random seed

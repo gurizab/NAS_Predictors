@@ -17,4 +17,4 @@ from .zerocost_v1 import ZeroCostV1
 from .zerocost_v2 import ZeroCostV2
 from .omni_ngb import OmniNGBPredictor
 from .omni_seminas import OmniSemiNASPredictor
-from .omni_xgb import OmniPredictor
+from .omni_predictor import OmniPredictor

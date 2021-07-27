@@ -32,7 +32,7 @@ class SVR_Estimator(Predictor):
         self.metric=metric
         self.require_hyperparameters = require_hyper
 
-    def fit(self, xtrain, ytrain, info, learn_hyper=True):
+    def fit(self, xtrain, ytrain, info, learn_hyper=True, train_indexes=None):
 
         # prepare training data
         xtrain_data = self.prepare_data(info)
@@ -146,7 +146,7 @@ class SVR_Estimator(Predictor):
         return X
 
 
-    def query(self, xtest, info):
+    def query(self, xtest, info, val_indexes=None):
         data = self.prepare_data(info)
         pred_on_test_set = self.best_model.predict(data)        
         return pred_on_test_set

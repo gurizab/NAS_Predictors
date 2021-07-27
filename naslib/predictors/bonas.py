@@ -223,7 +223,7 @@ class BonasPredictor(Predictor):
         return train_error
 
     def fit(self, xtrain, ytrain, train_info=None,
-            epochs=100, wd=0, omni=False):
+            epochs=100, wd=0, omni=False, **kwargs):
 
         if self.hyperparams is None:
             self.hyperparams = self.default_hyperparams.copy()
@@ -277,7 +277,7 @@ class BonasPredictor(Predictor):
         train_error = np.mean(abs(train_pred-ytrain))
         return train_error
 
-    def query(self, xtest, info=None, eval_batch_size=100, omni=False):
+    def query(self, xtest, info=None, eval_batch_size=100, omni=False, **kwargs):
         if omni:
             test_data = xtest
         else:

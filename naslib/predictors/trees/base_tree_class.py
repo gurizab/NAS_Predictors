@@ -63,7 +63,7 @@ class BaseTree(Predictor):
 
         return train_error
 
-    def query(self, xtest, info=None):
+    def query(self, xtest, info=None, **kwargs):
 
         if type(xtest) is list:
             #  when used in itself, we use

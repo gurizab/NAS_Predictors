@@ -86,7 +86,7 @@ class Ensemble(Predictor):
 
         return [copy.deepcopy(trainable_predictors[self.predictor_type]) for _ in range(self.num_ensemble)]
 
-    def fit(self, xtrain, ytrain, train_info=None, omni=False):
+    def fit(self, xtrain, ytrain, train_info=None, omni=False, **kwargs):
         if self.ensemble is None:
             self.ensemble = self.get_ensemble()
 
@@ -103,13 +103,13 @@ class Ensemble(Predictor):
         
         return train_errors
 
-    def query(self, xtest, info=None, omni=False):
+    def query(self, xtest, info=None, omni=False, **kwargs):
         predictions = []
         for i in range(self.num_ensemble):
             prediction = self.ensemble[i].query(xtest, info, omni=omni)
             predictions.append(prediction)
             
-        return np.array(predictions)
+        return np.mean(predictions, axis=0)
     
     def set_hyperparams(self, params):
         if self.ensemble is None:

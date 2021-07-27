@@ -32,7 +32,7 @@ class BNN(Predictor):
         train_error = np.mean(abs(train_pred - _ytrain))
         return train_error
 
-    def query(self, xtest, info=None, omni=False):
+    def query(self, xtest, info=None, omni=False, **kwargs):
         if omni:
             test_data = xtest
         else:

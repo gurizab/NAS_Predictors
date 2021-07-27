@@ -70,7 +70,7 @@ class MLPPredictor(Predictor):
         return predictor
 
     def fit(self, xtrain, ytrain, train_info=None,
-            epochs=500, loss='mae', verbose=0, omni=False):
+            epochs=500, loss='mae', verbose=0, omni=False, train_indexes=None):
         
         if self.hyperparams is None:
             self.hyperparams = self.default_hyperparams.copy()
@@ -137,7 +137,7 @@ class MLPPredictor(Predictor):
         train_error = np.mean(abs(train_pred-ytrain))
         return train_error
 
-    def query(self, xtest, info=None, eval_batch_size=None, omni=False):
+    def query(self, xtest, info=None, eval_batch_size=None, omni=False, val_indexes=None):
         if not omni:
             xtest = np.array([encode(arch, encoding_type=self.encoding_type,
                           ss_type=self.ss_type) for arch in xtest])

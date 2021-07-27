@@ -466,10 +466,12 @@ class OmniSemiNASPredictor(Predictor):
     # todo: make the code general to support any zerocost predictors
     def __init__(self, encoding_type='seminas', ss_type=None, semi=True, hpo_wrapper=False, 
                  config=None, run_pre_compute=True, jacov_onehot=True, synthetic_factor=1, 
-                 max_zerocost=np.inf, zero_cost=[], lce=[]):
+                 max_zerocost=np.inf, zero_cost=['grad_norm'], lce=['sotle']):
+        self.zero_cost_all = ['grad_norm'] #, 'jacov' , 'snip', 'synflow', 'grasp', 'fisher', 'grad_norm']
         self.encoding_type = encoding_type
         self.semi = semi
         self.synthetic_factor = synthetic_factor
+        self.lce_all = ['sotle'] # , 'valacc']
         self.lce = lce
         self.ss_type = ss_type
         self.hpo_wrapper = hpo_wrapper
@@ -488,7 +490,7 @@ class OmniSemiNASPredictor(Predictor):
         # todo: this should be generalized to any zero-cost method
         self.jacov_onehot = jacov_onehot
 
-    def prepare_features(self, xdata, zc_info=None, lc_info=None):
+    def prepare_features(self, xdata, zc_info=None, lc_info=None, indexes=None):
         # this concatenates architecture features with zero-cost features        
         full_xdata = [[] for _ in range(len(xdata))]
 
@@ -506,10 +508,14 @@ class OmniSemiNASPredictor(Predictor):
             # add zero_cost features
             for key in self.zero_cost:
                 for i in range(len(xdata)):
-                    # todo: the following code is still specific to jacov. Make it for any zerocost
-                    # currently only one_hot zc features are supported
-                    jac_encoded = discretize(zc_info['jacov_scores'][i], upper_bounds=self.jacov_bins, 
+                    if indexes is None:
+                        # todo: the following code is still specific to jacov. Make it for any zerocost
+                        # currently only one_hot zc features are supported
+                        jac_encoded = discretize(zc_info['jacov_scores'][i], upper_bounds=self.jacov_bins,
                                              one_hot=self.jacov_onehot)
+                    else:
+                        jac_encoded = discretize(zc_info['jacov_scores'][indexes[i]], upper_bounds=self.jacov_bins,
+                                                 one_hot=self.jacov_onehot)
                     jac_encoded = [jac + self.zc_offset for jac in jac_encoded]
                     full_xdata[i] = [*full_xdata[i], *jac_encoded]
 
@@ -552,7 +558,7 @@ class OmniSemiNASPredictor(Predictor):
     
     def fit(self, xtrain, ytrain, train_info=None,
             wd=0, iterations=1, epochs=50,
-            pretrain_epochs=50):
+            pretrain_epochs=50, train_indexes=None):
         
         self.train_size = len(xtrain)
         self.add_lce = self.check_fidelity(train_info)
@@ -627,7 +633,8 @@ class OmniSemiNASPredictor(Predictor):
         # encode the training data (including zero cost if applicable)
         xtrain_full_features = self.prepare_features(xtrain, 
                                                      zc_info=self.xtrain_zc_info, 
-                                                     lc_info=train_info)
+                                                     lc_info=train_info,
+                                                     indexes=train_indexes)
         for i in range(iterations):
             print('Iteration {}'.format(i+1))
 
@@ -655,13 +662,20 @@ class OmniSemiNASPredictor(Predictor):
                 train_controller(self.model, combined_input, combined_target, epochs)
                 print('Finish training EPD')
 
-    def query(self, xtest, info=None, batch_size=100):
+    def query(self, xtest, info=None, batch_size=100, val_indexes=None):
 
         if self.run_pre_compute:
             # if we ran pre_compute(), the xtest zc scores are in self.xtest_zc_info
-            test_data = self.prepare_features(xtest, 
-                                              zc_info=self.xtest_zc_info, 
-                                              lc_info=info)
+            if val_indexes is None:
+                test_data = self.prepare_features(xtest,
+                                                  zc_info=self.xtest_zc_info,
+                                                  lc_info=info)
+            else:
+                test_data = self.prepare_features(xtest,
+                                                  zc_info=self.xtrain_zc_info,
+                                                  lc_info=info,
+                                                  indexes=val_indexes
+                                                  )
         else:
             # otherwise, they will be in info (often used during NAS experiments)
             test_data = self.prepare_features(xtest, zc_info=info)            
@@ -709,14 +723,18 @@ class OmniSemiNASPredictor(Predictor):
         self.unlabeled_zc_info = {}
         self.unlabeled = unlabeled
 
-        if len(self.zero_cost) > 0:
+        if len(self.zero_cost_all) > 0:
             self.train_loader, _, _, _, _ = utils.get_train_val_loaders(self.config, mode='train')
 
-            for method_name in self.zero_cost:
+            for method_name in self.zero_cost_all:
                 if self.ss_type in ['nasbench101', 'darts']:
                     zc_method = ZeroCostV2(self.config, batch_size=64, method_type=method_name)
                 else:
-                    zc_method = ZeroCostV1(self.config, batch_size=64, method_type=method_name)
+                    if method_name == 'jacov':
+                        zc_method = ZeroCostV1(self.config, batch_size=64, method_type=method_name)
+                    else:
+                        zc_method = ZeroCostV2(self.config, batch_size=64, method_type=method_name)
+
                 zc_method.train_loader = copy.deepcopy(self.train_loader)
                 
                 # save the raw scores, since bucketing depends on the train set size
@@ -748,12 +766,12 @@ class OmniSemiNASPredictor(Predictor):
         or hyperparameters of the architecture
         """
         self.metric = None
-        if len(self.lce) > 0:
+        if len(self.lce_all) > 0:
             # add the metrics needed for the lce predictors
             required_metric_dict = {'sotle':Metric.TRAIN_LOSS}
-            self.metric = [required_metric_dict[key] for key in self.lce]
+            self.metric = [required_metric_dict[key] for key in self.lce_all]
 
-        reqs = {'requires_partial_lc':len(self.lce) > 0, 
+        reqs = {'requires_partial_lc':len(self.lce_all) > 0,
                 'metric':self.metric, 
                 'requires_hyperparameters':False, 
                 'hyperparams':{}, 

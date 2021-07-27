@@ -529,12 +529,10 @@ def cross_validation(xtrain, ytrain, train_info, predictor, split_indices, score
         xval_i = [xtrain[j] for j in validation_indices]
         yval_i = [ytrain[j] for j in validation_indices]
 
-        predictor.fit(xtrain_i, ytrain_i, train_info_i)
-        ypred_i = predictor.query(xval_i, val_info_i)
+        predictor.fit(xtrain_i, ytrain_i, train_info_i, train_indexes=train_indices)
+        ypred_i = predictor.query(xtest=xval_i, info=val_info_i, val_indexes=validation_indices)
         
         #If the predictor is an ensemble, take the mean
-        if len(ypred_i.shape) > 1:
-            ypred_i = np.mean(ypred_i, axis=0)
         
         # use Pearson correlation to be the metric -> maximise Pearson correlation
         if score_metric == 'pearson':

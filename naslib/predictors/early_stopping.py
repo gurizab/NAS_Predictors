@@ -9,7 +9,7 @@ class EarlyStopping(Predictor):
         
         self.metric = metric
     
-    def query(self, xtest, info):
+    def query(self, xtest, info, val_indexes=None):
         """
         info: a list of dictionaries which include the learning curve of the
         corresponding architecture.

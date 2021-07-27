@@ -32,6 +32,26 @@ class BaseGPModel(Predictor):
     def get_model(self, train_data, **kwargs):
         return NotImplementedError
 
+    @property
+    def default_hyperparams(self):
+        params = {
+            'kernel_type': 'RBF',
+            'lengthscale': 10,
+        }
+        return params
+
+    def set_random_hyperparams(self):
+        if self.hyperparams is None:
+            # evaluate the default config first during HPO
+            params = self.default_hyperparams.copy()
+        else:
+            params = {
+                'kernel_type': np.random.choice(['RBF', 'Matern32', 'Matern52']),
+                'lengthscale': np.random.uniform(low=1e-5, high=1e5),
+            }
+        self.set_hyperparams(params)
+        return params
+
     def train(self, train_data, **kwargs):
         pass
 
@@ -81,7 +101,7 @@ class BaseGPModel(Predictor):
 
         return train_error
 
-    def query(self, xtest, info=None, omni=False):
+    def query(self, xtest, info=None, omni=False, **kwargs):
         if not omni:
             xtest = np.array([encode(arch, encoding_type=self.encoding_type,
                                  ss_type=self.ss_type) for arch in xtest])

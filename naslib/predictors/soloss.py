@@ -16,7 +16,7 @@ class SoLosspredictor(Predictor):
         self.name = 'SoLoss'
         self.need_separate_hpo = False
 
-    def query(self, xtest, info):
+    def query(self, xtest, info, val_indexes=None):
         """
         This can be called any number of times during the NAS algorithm.
         inputs: list of architectures, 
