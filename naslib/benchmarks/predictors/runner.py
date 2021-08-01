@@ -61,7 +61,7 @@ supported_predictors = {
     'var_sparse_gp': VarSparseGPPredictor(encoding_type='adjacency_one_hot',
                                           optimize_gp_hyper=True, num_steps=200, hpo_wrapper=True),
     'xgb': XGBoost(encoding_type='adjacency_one_hot', hpo_wrapper=True),
-    'gat': SpGAT.GATPredictor(encoding_type='gcn', hpo_wrapper=True),
+    'gat': GATPredictor(encoding_type='gat', hpo_wrapper=True),
     # path encoding experiments:
     'bayes_lin_reg_path': BayesianLinearRegression(encoding_type='path'),
     'bohamiann_path': BOHAMIANN(encoding_type='path'),

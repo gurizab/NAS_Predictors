@@ -108,6 +108,37 @@ def encode_gcn_nasbench201(arch):
 
     return dic
 
+def encode_gat_nasbench201(arch):
+    '''
+    Input:
+    a list of categorical ops starting from 0
+    '''
+    ops = arch.get_op_indices()
+    # offset ops list by one, add input and output to ops list
+    ops = [op+1 for op in ops]
+    ops = [0, *ops, 6]
+    #print(ops)
+    ops_onehot = np.array([[i == op for i in range(7)] for op in ops], dtype=np.float32)
+    matrix = np.array(
+            [[0, 1, 1, 1, 0, 0, 0, 0],
+            [0, 0, 0, 0, 1, 1, 0, 0],
+            [0, 0, 0, 0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 0, 0, 0, 1],
+            [0, 0, 0, 0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 0, 0, 0, 1],
+            [0, 0, 0, 0, 0, 0, 0, 1],
+            [0, 0, 0, 0, 0, 0, 0, 0]],dtype=np.float32)
+    #matrix = np.transpose(matrix)
+    dic = {
+        'num_vertices': 8,
+        'adjacency': matrix,
+        'operations': ops_onehot,
+        'mask': np.array([i < 8 for i in range(8)], dtype=np.float32),
+        'val_acc': 0.0
+    }
+
+    return dic
+
 
 def encode_bonas_nasbench201(arch):
     '''
@@ -201,6 +232,9 @@ def encode_201(arch, encoding_type='adjacency_one_hot'):
 
     elif encoding_type == 'seminas':
         return encode_seminas_nasbench201(arch)
+
+    elif encoding_type == 'gat':
+        return encode_gat_nasbench201(arch)
 
     else:
         logger.info('{} is not yet supported as a predictor encoding'.format(encoding_type))
