@@ -94,6 +94,16 @@ class PredictorConfigSpace:
             kernel_gp = CategoricalHyperparameter('kernel_type', ['RBF', 'Matern32', 'Matern52'], default_value='RBF')
             lengthscale_gp = UniformFloatHyperparameter('lengthscale', 1e-5, 1e5, default_value=10)
             cs.add_hyperparameters([kernel_gp, lengthscale_gp])
-
+        elif self.predictor_type == 'GAT':
+            # GAT
+            hidden_l = UniformIntegerHyperparameter('hidden_l', 64, 200, default_value=64, log=True)
+            batch_size = UniformIntegerHyperparameter('batch_size', 5, 32, default_value=7, log=True)
+            lr = UniformFloatHyperparameter('lr', 0.00001, 0.1, default_value=0.0001, log=True)
+            wd = UniformFloatHyperparameter('wd', 0.00001, 0.1, default_value=3e-4, log=True)
+            dropout = UniformFloatHyperparameter('dropout', 0.1, 0.5, default_value=0.1, log=True)
+            alpha = UniformFloatHyperparameter('alpha', 1e-5, 0.1, default_value=1e-4, log=True)
+            nheads = UniformIntegerHyperparameter('nheads', 1, 32, default_value=4, log=True)
+            cs.add_hyperparameters([hidden_l, batch_size, lr, wd, dropout, alpha, nheads])
+            print('===============================gat================')
         return cs
 
