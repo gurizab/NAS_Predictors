@@ -10,7 +10,7 @@ DNGOPredictor, EarlyStopping, Ensemble, GCNPredictor, GPPredictor, \
 LCEPredictor, LCEMPredictor, LGBoost, MLPPredictor, NGBoost, OmniNGBPredictor, \
 OmniSemiNASPredictor, RandomForestPredictor, SVR_Estimator, SemiNASPredictor, \
 SoLosspredictor, SparseGPPredictor, VarSparseGPPredictor, XGBoost, ZeroCostV1, \
-ZeroCostV2, GPWLPredictor, OmniPredictor
+ZeroCostV2, GPWLPredictor, OmniPredictor, GATPredictor
 
 from naslib.search_spaces.core.query_metrics import Metric
 from naslib.search_spaces import NasBench101SearchSpace, NasBench201SearchSpace, \
@@ -61,6 +61,7 @@ supported_predictors = {
     'var_sparse_gp': VarSparseGPPredictor(encoding_type='adjacency_one_hot',
                                           optimize_gp_hyper=True, num_steps=200, hpo_wrapper=True),
     'xgb': XGBoost(encoding_type='adjacency_one_hot', hpo_wrapper=True),
+    'gat': SpGAT.GATPredictor(encoding_type='gcn', hpo_wrapper=True),
     # path encoding experiments:
     'bayes_lin_reg_path': BayesianLinearRegression(encoding_type='path'),
     'bohamiann_path': BOHAMIANN(encoding_type='path'),

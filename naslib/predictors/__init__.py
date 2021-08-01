@@ -18,3 +18,4 @@ from .zerocost_v2 import ZeroCostV2
 from .omni_ngb import OmniNGBPredictor
 from .omni_seminas import OmniSemiNASPredictor
 from .omni_predictor import OmniPredictor
+from .gat import GATPredictor
